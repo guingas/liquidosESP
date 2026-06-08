@@ -45,9 +45,9 @@
 #include <Adafruit_AS7341.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-// OLED é opcional — descomente as linhas abaixo se quiser usar display
-// Se não tiver as bibliotecas instaladas, defina NO_OLED
-// #define NO_OLED
+// OLED é opcional — comente a linha abaixo se quiser usar display OLED
+// Para usar OLED: comente #define NO_OLED e instale Adafruit SSD1306 + GFX
+#define NO_OLED
 #ifndef NO_OLED
   #include <Adafruit_GFX.h>
   #include <Adafruit_SSD1306.h>
