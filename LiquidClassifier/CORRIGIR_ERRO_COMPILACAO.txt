@@ -1,0 +1,20 @@
+Se a compilação do TensorFlowLite_ESP32 falhar com o erro:
+  "error: assignment of read-only member 'flatbuffers::span<T, Extent>::count_'"
+
+Siga estes passos:
+
+1. Localize a pasta do ESP32 no Arduino IDE.
+   No Windows, geralmente fica em:
+   C:\Users\<SEU_USUARIO>\AppData\Local\Arduino15\packages\esp32\hardware\esp32\<VERSAO>\
+
+2. Crie (ou edite) o arquivo "platform.local.txt" nessa pasta.
+
+3. Adicione esta linha ao arquivo:
+   compiler.cpp.extra_flags=-fpermissive
+
+4. Salve o arquivo e reinicie o Arduino IDE.
+
+5. Compile novamente.
+
+NOTA: Se voce nao encontrar a pasta AppData, ela pode estar oculta.
+No Windows Explorer, va em Exibir > Itens ocultos e marque a opcao.

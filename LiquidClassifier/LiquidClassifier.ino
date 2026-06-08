@@ -588,6 +588,7 @@ void setup() {
     model = tflite::GetModel(liquid_classifier);
     if (model->version() != TFLITE_SCHEMA_VERSION) {
         Serial.println("ERRO: versao do schema incompativel!");
+#ifndef NO_OLED
         if (oled_ok) {
             display.clearDisplay();
             display.setCursor(0, 0);
@@ -595,6 +596,7 @@ void setup() {
             display.println("versao incompativel!");
             display.display();
         }
+#endif
         while (1) { set_led(255, 0, 0); delay(500); set_led(0, 0, 0); delay(500); }
     }
 

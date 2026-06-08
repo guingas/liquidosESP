@@ -1,0 +1,700 @@
+% ============================================================
+%  Apresentação — LiquidClassifier
+%  Identificação de Líquidos com ESP32 e Machine Learning
+% ============================================================
+\documentclass[aspectratio=169, 11pt]{beamer}
+
+% ------- Tema e cores -------
+\usetheme{Madrid}
+\usecolortheme{whale}
+\definecolor{fordblue}{RGB}{0,48,135}
+\setbeamercolor{structure}{fg=fordblue}
+\setbeamercolor{title}{fg=white,bg=fordblue}
+\setbeamercolor{frametitle}{fg=white,bg=fordblue}
+\setbeamercolor{block title}{fg=white,bg=fordblue}
+\setbeamercolor{block body}{bg=fordblue!5}
+
+% ------- Pacotes -------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazilian]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit}
+\usepackage{listings}
+\usepackage{fontawesome5}
+\usepackage{multicol}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+}
+
+% ------- Metadados -------
+\title[LiquidClassifier]{LiquidClassifier}
+\subtitle{Identificação de Líquidos com ESP32 e Machine Learning}
+\author[Tiago, Paulo, Enzo]{%
+  Tiago Avelino \and Paulo Mascarenhas \and Enzo Oliveira%
+}
+\institute{Laboratório 7 — Sistemas Embarcados com IA}
+\date{Junho 2026}
+
+% ------- Início -------
+\begin{document}
+
+% ============================================================
+% SLIDE 1 — CAPA
+% ============================================================
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% ============================================================
+% SLIDE 2 — AGENDA
+% ============================================================
+\begin{frame}{Agenda}
+  \tableofcontents
+\end{frame}
+
+% ============================================================
+% SEÇÃO 1 — INTRODUÇÃO
+% ============================================================
+\section{Introdução e Motivação}
+
+\begin{frame}{O Problema}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \begin{block}{Desafio}
+        Classificar diferentes tipos de líquidos de forma \textbf{automática, portátil e de baixo custo}, sem necessidade de laboratório.
+      \end{block}
+      \vspace{0.3cm}
+      \textbf{Aplicações:}
+      \begin{itemize}
+        \item Detecção de \textbf{adulteração} de combustíveis
+        \item Verificação de \textbf{potabilidade} da água
+        \item Controle de qualidade de bebidas
+        \item Segurança alimentar
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \begin{block}{Solução}
+        \centering
+        \textbf{ESP32} + \textbf{sensores multimodais} + \textbf{modelo de ML embarcado (TFLite)}
+      \end{block}
+      \vspace{0.3cm}
+      \begin{alertblock}{4 classes}
+        \begin{enumerate}
+          \item Água
+          \item Gasolina
+          \item Suco
+          \item Bebida alcoólica
+        \end{enumerate}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============================================================
+% SEÇÃO 2 — HARDWARE
+% ============================================================
+\section{Hardware e Sensores}
+
+\begin{frame}{Arquitetura de Hardware}
+  \begin{center}
+    \begin{tikzpicture}[
+      sensor/.style={rectangle, draw=fordblue, fill=fordblue!10, rounded corners, minimum width=3cm, minimum height=0.7cm, align=center, font=\small},
+      mcu/.style={rectangle, draw=fordblue, fill=fordblue!20, rounded corners, minimum width=3.5cm, minimum height=1.2cm, align=center, font=\bfseries},
+      output/.style={rectangle, draw=orange!80!black, fill=orange!10, rounded corners, minimum width=2.8cm, minimum height=0.7cm, align=center, font=\small},
+      arr/.style={-{Stealth[length=5pt]}, thick, fordblue}
+    ]
+      % MCU
+      \node[mcu] (esp) {ESP32\\DevKit V1};
+
+      % Sensores (esquerda)
+      \node[sensor, left=2.5cm of esp, yshift=1.8cm]  (as)   {AS7341\\Espectro 11ch};
+      \node[sensor, left=2.5cm of esp, yshift=0.6cm]   (ds)   {DS18B20\\Temperatura};
+      \node[sensor, left=2.5cm of esp, yshift=-0.6cm]  (ph)   {Módulo pH\\E-201-C};
+      \node[sensor, left=2.5cm of esp, yshift=-1.8cm] (cond) {Eletrodos PCB\\Condutividade};
+      \node[sensor, left=2.5cm of esp, yshift=-3.0cm]  (piezo){Piezoelétrico\\Acústico};
+
+      % Saídas (direita)
+      \node[output, right=2.5cm of esp, yshift=1.0cm]  (serial) {Serial Monitor\\(PC / 115200 baud)};
+      \node[output, right=2.5cm of esp, yshift=-0.3cm] (led)    {LED RGB\\Cor por classe};
+      \node[output, right=2.5cm of esp, yshift=-1.6cm] (oled)   {OLED SSD1306\\(opcional)};
+
+      % Setas
+      \foreach \s in {as,ds,ph,cond,piezo}
+        \draw[arr] (\s) -- (esp);
+      \foreach \o in {serial,led,oled}
+        \draw[arr] (esp) -- (\o);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Sensores — 14 Grandezas Medidas}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\faThermometerHalf\ Sensores Físico-Químicos}
+        \begin{tabular}{ll}
+          \toprule
+          \textbf{Sensor} & \textbf{Grandeza} \\
+          \midrule
+          DS18B20     & Temperatura ($^\circ$C) \\
+          Eletrodos   & Condutividade ($\mu$S/cm) \\
+          pH E-201-C  & pH (0--14) \\
+          Piezoelétrico & Freq.\ acústica (Hz) \\
+          \bottomrule
+        \end{tabular}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\faLightbulb\ Sensor Espectral AS7341}
+        \begin{tabular}{ll}
+          \toprule
+          \textbf{Canal} & \textbf{Comp.\ de onda} \\
+          \midrule
+          F1 & 415 nm (violeta) \\
+          F2 & 445 nm (azul) \\
+          F3 & 480 nm (azul) \\
+          F4 & 515 nm (verde) \\
+          F5 & 555 nm (verde-amarelo) \\
+          F6 & 590 nm (laranja) \\
+          F7 & 630 nm (vermelho) \\
+          F8 & 680 nm (vermelho) \\
+          Clear & Visível total \\
+          NIR & Infravermelho próximo \\
+          \bottomrule
+        \end{tabular}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Status Atual do Hardware}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{exampleblock}{\faCheckCircle\ Em mãos}
+        \begin{itemize}
+          \item[\textcolor{green!60!black}{\faCheck}] ESP32 DevKit V1
+          \item[\textcolor{green!60!black}{\faCheck}] Cabos e jumpers
+          \item[\textcolor{green!60!black}{\faCheck}] Sensores piezoelétricos
+          \item[\textcolor{green!60!black}{\faCheck}] Sensor de temperatura DS18B20
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{\faTruck\ Em rota de chegada (Mercado Livre)}
+        \begin{itemize}
+          \item[\textcolor{orange}{\faClock}] AS7341 (sensor espectral)
+          \item[\textcolor{orange}{\faClock}] Módulo pH E-201-C
+          \item[\textcolor{orange}{\faClock}] Eletrodos de condutividade
+          \item[\textcolor{orange}{\faClock}] LED RGB
+        \end{itemize}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+  \vspace{0.5cm}
+  \begin{center}
+    \textbf{Custo total estimado: $\sim$ R\$ 118} (sem display OLED opcional)
+  \end{center}
+\end{frame}
+
+% ============================================================
+% SEÇÃO 3 — PIPELINE DE ML
+% ============================================================
+\section{Pipeline de Machine Learning}
+
+\begin{frame}{Visão Geral do Workflow}
+  \begin{center}
+    \begin{tikzpicture}[
+      wfbox/.style={rectangle, draw=fordblue, fill=fordblue!15, rounded corners, minimum width=2.2cm, minimum height=1cm, align=center, font=\small\bfseries},
+      arr/.style={-{Stealth[length=5pt]}, very thick, fordblue},
+      note/.style={font=\tiny, align=center, text=gray}
+    ]
+      \node[wfbox] (gen)   at (0,0)    {1. Geração\\de Dados};
+      \node[wfbox] (feat)  at (3,0)    {2. Feature\\Engineering};
+      \node[wfbox] (train) at (6,0)    {3. Treinamento\\6 Modelos};
+      \node[wfbox] (eval)  at (9,0)    {4. Avaliação\\Comparativa};
+      \node[wfbox] (conv)  at (12,0)   {5. Conversão\\TFLite int8};
+      \node[wfbox] (sim)   at (3,-2.2) {6. Simulação\\de Cenários};
+      \node[wfbox] (dep)   at (6,-2.2) {7. Deploy\\Arduino IDE};
+      \node[wfbox] (flash) at (9,-2.2) {8. Flash\\ESP32};
+      \node[wfbox] (run)   at (12,-2.2){9. Execução\\em Campo};
+
+      \draw[arr] (gen)   -- (feat);
+      \draw[arr] (feat)  -- (train);
+      \draw[arr] (train) -- (eval);
+      \draw[arr] (eval)  -- (conv);
+      \draw[arr] (conv)  |- (sim);
+      \draw[arr] (sim)   -- (dep);
+      \draw[arr] (dep)   -- (flash);
+      \draw[arr] (flash) -- (run);
+
+      \node[note, below=0.1cm of gen]   {500 amostras\\$\times$ 22 classes};
+      \node[note, below=0.1cm of feat]  {22 features\\8 derivadas};
+      \node[note, below=0.1cm of train] {RF, XGB, MLP\\CNN, SVM, k-NN};
+      \node[note, below=0.1cm of eval]  {Acc, F1\\Confusion Matrix};
+      \node[note, below=0.1cm of conv]  {22 KB\\quantizado};
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% ---------- ETAPA 1: Dados ----------
+\begin{frame}{Etapa 1 — Geração de Dados Sintéticos}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \begin{block}{Estratégia}
+        \begin{itemize}
+          \item \textbf{22 perfis} de líquidos com propriedades físico-químicas reais
+          \item \textbf{500 amostras} por classe (11.000 total)
+          \item Ruído gaussiano ($\sigma = 5\%$) para simular variações reais
+          \item Seed fixo (\texttt{RANDOM\_SEED=42}) para reprodutibilidade
+        \end{itemize}
+      \end{block}
+      \vspace{0.3cm}
+      \begin{block}{Divisão dos Dados}
+        \begin{tabular}{lcc}
+          \toprule
+          \textbf{Conjunto} & \textbf{Proporção} & \textbf{Uso} \\
+          \midrule
+          Treino    & 70\% & Aprendizado \\
+          Validação & 15\% & Ajuste de hiperparâmetros \\
+          Teste     & 15\% & Avaliação final \\
+          \bottomrule
+        \end{tabular}
+      \end{block}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \begin{block}{22 Subtipos de Líquidos}
+        \scriptsize
+        \begin{tabular}{ll}
+          \toprule
+          \textbf{Tipo} & \textbf{Subtipos} \\
+          \midrule
+          Água  & Torneira, Mineral, \\
+                & Mineral c/ gás, Contaminada \\
+          \midrule
+          Gasolina & Pura, Adulterada \\
+                   & 10\%, 20\%, 30\% \\
+          \midrule
+          Suco  & Laranja, Uva, Limão, \\
+                & Maçã, Manga \\
+          \midrule
+          Alcoólica & Heineken, Stella, \\
+                    & Budweiser, IPA, \\
+                    & Vinho tinto/branco, \\
+                    & Vodka, Cachaça, \\
+                    & Whisky, adulteradas \\
+          \bottomrule
+        \end{tabular}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------- ETAPA 2: Features ----------
+\begin{frame}{Etapa 2 — Feature Engineering}
+  \begin{block}{14 features dos sensores $\rightarrow$ 22 features totais (8 derivadas)}
+  \end{block}
+  \vspace{0.2cm}
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \textbf{14 Features dos Sensores:}
+      \begin{itemize}
+        \item Temperatura ($^\circ$C)
+        \item Condutividade ($\mu$S/cm)
+        \item pH
+        \item 8 canais espectrais (F1--F8)
+        \item Clear, NIR
+        \item Frequência acústica (Hz)
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{8 Features Derivadas (on-device):}
+      \begin{itemize}
+        \item $\text{cond}_{25} = \dfrac{\text{cond}}{1 + 0.02 \cdot (T - 25)}$
+        \vspace{0.1cm}
+        \item $\text{ratio\_azul\_verm} = \dfrac{F3_{480}}{F7_{630}}$
+        \vspace{0.1cm}
+        \item $\text{ratio\_verde\_verm} = \dfrac{F4_{515}}{F7_{630}}$
+        \vspace{0.1cm}
+        \item $\text{ratio\_NIR\_Clear} = \dfrac{\text{NIR}}{\text{Clear}}$
+        \vspace{0.1cm}
+        \item $\text{ratio\_violeta\_laranja} = \dfrac{F1_{415}}{F6_{590}}$
+        \vspace{0.1cm}
+        \item spectral\_mean, spectral\_std, spectral\_range
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vspace{0.3cm}
+  \begin{center}
+    \small\textit{Normalização: StandardScaler (média=0, desvio=1) — parâmetros exportados para o ESP32}
+  \end{center}
+\end{frame}
+
+% ---------- ETAPA 3: Treinamento ----------
+\begin{frame}{Etapa 3 — Treinamento de Modelos (scikit-learn)}
+  \begin{block}{6 modelos treinados e comparados com scikit-learn, XGBoost e TensorFlow}
+  \end{block}
+  \vspace{0.3cm}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{tabular}{ll}
+        \toprule
+        \textbf{Modelo} & \textbf{Framework} \\
+        \midrule
+        Random Forest & scikit-learn \\
+        XGBoost       & xgboost \\
+        MLP (Rede Neural) & TensorFlow/Keras \\
+        CNN 1D        & TensorFlow/Keras \\
+        SVM (RBF)     & scikit-learn \\
+        k-NN          & scikit-learn \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Hiperparâmetros principais:}
+      \begin{itemize}
+        \item RF: 200 árvores, profundidade 15
+        \item XGB: 200 estimadores, lr=0.1
+        \item MLP: [128, 64, 32] neurônios
+        \item CNN: 2 camadas conv1D
+        \item SVM: kernel RBF, $C=1.0$
+        \item k-NN: $k=5$, pesos por distância
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------- ETAPA 4: Classificação Hierárquica ----------
+\begin{frame}{Etapa 4 — Classificação Hierárquica (7 Estágios)}
+  \begin{center}
+    \begin{tikzpicture}[
+      box/.style={rectangle, draw=fordblue, fill=fordblue!10, rounded corners, minimum width=2.5cm, minimum height=0.65cm, align=center, font=\scriptsize\bfseries},
+      leaf/.style={rectangle, draw=green!50!black, fill=green!10, rounded corners, minimum width=2cm, minimum height=0.5cm, align=center, font=\tiny},
+      arr/.style={-{Stealth[length=4pt]}, thick, fordblue}
+    ]
+      % Nível 1
+      \node[box] (tipo) at (0,0) {Etapa 3: TIPO\\(4 classes)};
+
+      % Nível 2
+      \node[box] (agua) at (-5,-1.5) {4a: Água\\variante};
+      \node[box] (gas)  at (-1.7,-1.5) {4b: Gasolina\\adulteração};
+      \node[box] (suco) at (1.7,-1.5)  {4c: Suco\\sabor};
+      \node[box] (alc)  at (5,-1.5)   {4d: Alcoólica\\subtipo};
+
+      % Nível 3
+      \node[box] (cerv) at (3.5,-3)  {4e: Cerveja\\marca};
+      \node[box] (gen)  at (6.5,-3)  {4f: Genuína\\vs adulterada};
+
+      \draw[arr] (tipo) -- (agua);
+      \draw[arr] (tipo) -- (gas);
+      \draw[arr] (tipo) -- (suco);
+      \draw[arr] (tipo) -- (alc);
+      \draw[arr] (alc)  -- (cerv);
+      \draw[arr] (alc)  -- (gen);
+    \end{tikzpicture}
+  \end{center}
+  \vspace{0.3cm}
+  \small Cada etapa treina e compara os 6 modelos de ML independentemente.
+\end{frame}
+
+% ---------- ETAPA 5: Resultados ----------
+\begin{frame}{Resultados — Acurácia por Etapa}
+  \begin{center}
+    \begin{tabular}{llcc}
+      \toprule
+      \textbf{Etapa} & \textbf{Problema} & \textbf{Melhor Modelo} & \textbf{Acurácia Teste} \\
+      \midrule
+      3  & Tipo (4 classes)         & \textbf{k-NN}     & \textcolor{green!50!black}{\textbf{99,82\%}} \\
+      4a & Água — variante          & XGBoost            & 97,87\% \\
+      4b & Gasolina — adulteração   & XGBoost            & 88,27\% \\
+      4c & Suco — sabor             & XGBoost            & 97,87\% \\
+      4d & Alcoólica — subtipo      & k-NN               & 96,92\% \\
+      4e & Cerveja — marca          & k-NN               & 93,60\% \\
+      4f & Genuína vs adulterada    & k-NN               & 99,37\% \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vspace{0.5cm}
+  \begin{block}{Modelo Selecionado para Deploy}
+    \textbf{MLP (Rede Neural)} convertido para TFLite int8 — melhor equilíbrio entre acurácia e compatibilidade com microcontrolador.
+  \end{block}
+\end{frame}
+
+% ============================================================
+% SEÇÃO 4 — CONVERSÃO E DEPLOY
+% ============================================================
+\section{Conversão TFLite e Deploy}
+
+\begin{frame}{Etapa 5 — Conversão para TFLite int8}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Processo de Conversão}
+        \begin{enumerate}
+          \item Treinar MLP com Keras 3
+          \item Exportar com \texttt{tf.Module} + \texttt{concrete\_functions}
+          \item Quantização pós-treinamento \textbf{int8}
+          \item Gerar arquivo \texttt{.tflite}
+          \item Converter para \textbf{header C} (\texttt{.h})
+        \end{enumerate}
+      \end{block}
+      \vspace{0.2cm}
+      \begin{exampleblock}{Tamanho do Modelo}
+        \begin{itemize}
+          \item Keras original: \textbf{223 KB}
+          \item TFLite int8: \textbf{22 KB} ($\downarrow$ 90\%)
+          \item Arena de memória: \textbf{16 KB}
+        \end{itemize}
+      \end{exampleblock}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \begin{block}{Arquivos Gerados para ESP32}
+        \ttfamily\scriptsize
+        \begin{tabular}{ll}
+          \toprule
+          \textbf{Arquivo} & \textbf{Conteúdo} \\
+          \midrule
+          liquid\_classifier.h & Array C \\
+                               & do modelo (22 KB) \\
+          \midrule
+          normalization\_params.h & feature\_mean[22] \\
+                                  & feature\_scale[22] \\
+          \bottomrule
+        \end{tabular}
+      \end{block}
+      \vspace{0.3cm}
+      \begin{alertblock}{Quantização int8}
+        \small
+        $q = \text{round}\left(\dfrac{x}{\text{scale}} + \text{zero\_point}\right)$
+        \vspace{0.1cm}
+        \\Reduz 4$\times$ o tamanho e acelera inferência no ESP32.
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Etapa 6 — Simulação de Cenários Reais}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \begin{block}{Validação antes do deploy}
+        Simulação de 49 cenários realistas com o modelo TFLite:
+        \begin{itemize}
+          \item Água de torneira $\rightarrow$ ``Água'' \textcolor{green!60!black}{\faCheck}
+          \item Gasolina adulterada 20\% $\rightarrow$ ``Gasolina'' \textcolor{green!60!black}{\faCheck}
+          \item Suco de laranja $\rightarrow$ ``Suco'' \textcolor{green!60!black}{\faCheck}
+          \item Cerveja Heineken $\rightarrow$ ``Alcoólica'' \textcolor{green!60!black}{\faCheck}
+          \item Cachaça adulterada $\rightarrow$ ``Alcoólica'' \textcolor{green!60!black}{\faCheck}
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \begin{exampleblock}{Resultado da Simulação}
+        \centering
+        \Huge\textbf{45/49}\\
+        \normalsize acertos\\
+        \vspace{0.3cm}
+        \Large\textbf{91,8\%}\\
+        \normalsize de acurácia em cenários reais\\
+        \vspace{0.3cm}
+        \textcolor{green!60!black}{\Large\faCheckCircle\ APROVADO}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============================================================
+% SEÇÃO 5 — FIRMWARE
+% ============================================================
+\section{Firmware ESP32 — Arduino IDE}
+
+\begin{frame}[fragile]{Deploy — Sketch Arduino IDE}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Fluxo de Execução no ESP32}
+        \begin{enumerate}
+          \item Inicializar sensores e TFLite
+          \item Aguardar comando (botão / serial)
+          \item Ler \textbf{14 grandezas} dos sensores
+          \item Calcular \textbf{8 features derivadas}
+          \item Normalizar (StandardScaler)
+          \item Quantizar float $\rightarrow$ int8
+          \item Executar inferência TFLite
+          \item Desquantizar saída
+          \item Exibir resultado
+        \end{enumerate}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Saída dos Resultados}
+        \textbf{Serial Monitor} (saída principal):
+        \begin{lstlisting}
+ LIQUIDO: Agua
+ CONFIANCA: 98.7%
+ Temp:  23.5 C  pH: 7.01
+ Cond:   520 uS/cm
+        \end{lstlisting}
+        \vspace{0.2cm}
+        \textbf{LED RGB} (feedback visual):
+        \begin{itemize}
+          \item[\textcolor{blue}{\faCircle}] Azul = Água
+          \item[\textcolor{red}{\faCircle}] Vermelho = Alcoólica
+          \item[\textcolor{yellow!80!black}{\faCircle}] Amarelo = Gasolina
+          \item[\textcolor{green!60!black}{\faCircle}] Verde = Suco
+        \end{itemize}
+        \vspace{0.2cm}
+        \textbf{OLED SSD1306} (opcional)
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Bibliotecas e Compilação}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Bibliotecas (Arduino Library Manager)}
+        \begin{tabular}{ll}
+          \toprule
+          \textbf{Biblioteca} & \textbf{Obrigatória?} \\
+          \midrule
+          Adafruit AS7341 & \textcolor{green!60!black}{\faCheck}\ Sim \\
+          OneWire & \textcolor{green!60!black}{\faCheck}\ Sim \\
+          DallasTemperature & \textcolor{green!60!black}{\faCheck}\ Sim \\
+          TensorFlowLite\_ESP32 & \textcolor{green!60!black}{\faCheck}\ Sim \\
+          Adafruit SSD1306 & Só c/ OLED \\
+          Adafruit GFX & Só c/ OLED \\
+          \bottomrule
+        \end{tabular}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Passos para Deploy}
+        \begin{enumerate}
+          \item Instalar Arduino IDE
+          \item Adicionar suporte ESP32
+          \item Instalar bibliotecas
+          \item Abrir \texttt{LiquidClassifier.ino}
+          \item Board: ``ESP32 Dev Module''
+          \item Compilar e Upload
+          \item Abrir Serial Monitor (115200)
+        \end{enumerate}
+      \end{block}
+      \vspace{0.2cm}
+      \begin{alertblock}{\small Se TFLite não compilar}
+        \small Adicionar \texttt{-fpermissive} em \texttt{platform.local.txt}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============================================================
+% SEÇÃO 6 — REPOSITÓRIO
+% ============================================================
+\section{Repositório e Código}
+
+\begin{frame}[fragile]{Estrutura do Repositório GitHub}
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \begin{block}{\faGithub\ github.com/guingas/liquidosESP}
+        \begin{lstlisting}[basicstyle=\ttfamily\scriptsize,frame=none,backgroundcolor=\color{fordblue!5}]
+liquidosESP/
++-- README.md
++-- LiquidClassifier/
+|   +-- LiquidClassifier.ino
+|   +-- liquid_classifier.h
+|   \-- normalization_params.h
++-- models/tflite/
+|   \-- liquid_classifier.tflite
+\-- training/
+    +-- main.py
+    +-- config/
+    \-- src/
+        \end{lstlisting}
+      \end{block}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Conteúdo}
+        \begin{itemize}
+          \item \textbf{LiquidClassifier/} — Sketch Arduino pronto para compilar
+          \item \textbf{models/} — Modelo TFLite binário (22 KB)
+          \item \textbf{training/} — Pipeline Python completo para re-treinar o modelo
+          \item \textbf{README.md} — Documentação completa com diagrama de ligação
+        \end{itemize}
+      \end{block}
+      \vspace{0.2cm}
+      \begin{exampleblock}{Link do Repositório}
+        \centering
+        \Large\faGithub\ \textbf{guingas/liquidosESP}\\
+        \small\url{https://github.com/guingas/liquidosESP}
+      \end{exampleblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============================================================
+% SEÇÃO 7 — PRÓXIMOS PASSOS
+% ============================================================
+\section{Próximos Passos}
+
+\begin{frame}{Próximos Passos}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\faClock\ Curto Prazo}
+        \begin{enumerate}
+          \item Receber sensores (Mercado Livre)
+          \item Montar circuito completo
+          \item Calibrar sensores analógicos com soluções padrão
+          \item Compilar e fazer flash via Arduino IDE
+          \item Testar com líquidos reais
+        \end{enumerate}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{\faRocket\ Médio Prazo}
+        \begin{enumerate}
+          \item Coletar dados \textbf{reais} dos sensores
+          \item Re-treinar modelo com dados reais
+          \item Adicionar sub-classificação no ESP32
+          \item Comunicação Bluetooth/Wi-Fi
+          \item App mobile para visualização
+        \end{enumerate}
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{0.5cm}
+  \begin{center}
+    \begin{tikzpicture}
+      \node[rectangle, draw=fordblue, fill=fordblue!10, rounded corners, inner sep=10pt, font=\large] {
+        \textbf{Meta:} Sistema portátil, low-cost e autônomo de classificação de líquidos
+      };
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% ============================================================
+% SLIDE FINAL
+% ============================================================
+\begin{frame}[plain]
+  \begin{center}
+    \vspace{2cm}
+    {\Huge\textbf{Obrigado!}}\\
+    \vspace{1cm}
+    {\Large LiquidClassifier}\\
+    \vspace{0.5cm}
+    {\large Tiago Avelino $\cdot$ Paulo Mascarenhas $\cdot$ Enzo Oliveira}\\
+    \vspace{1cm}
+    \faGithub\ \url{https://github.com/guingas/liquidosESP}\\
+    \vspace{1cm}
+    {\small Laboratório 7 — Junho 2026}
+  \end{center}
+\end{frame}
+
+\end{document}
