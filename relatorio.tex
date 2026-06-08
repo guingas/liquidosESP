@@ -1,0 +1,612 @@
+% ============================================================
+%  Relat\'{o}rio T\'{e}cnico --- ENGC55
+%  Template Universidade Federal da Bahia (UFBA)
+% ============================================================
+\documentclass[12pt, a4paper]{article}
+
+% ------- Pacotes -------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazilian]{babel}
+\usepackage{geometry}
+\geometry{left=3cm, right=2cm, top=3cm, bottom=2cm}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{indentfirst}
+\setlength{\parindent}{1.25cm}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{longtable}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  tabsize=2,
+}
+
+\definecolor{ufbablue}{RGB}{0,48,135}
+
+% ------- Capa personalizada UFBA -------
+\begin{document}
+
+\begin{titlepage}
+  \begin{center}
+    \textbf{\large UNIVERSIDADE FEDERAL DA BAHIA}\\
+    \textbf{\large ESCOLA POLIT\'{E}CNICA}\\
+    \textbf{\large DEPARTAMENTO DE ENGENHARIA EL\'{E}TRICA E DE COMPUTA\c{C}\~{A}O}\\
+    \vspace{0.5cm}
+    \textbf{ENGC55 --- Sistemas Embarcados com Intelig\^{e}ncia Artificial}\\
+    \vspace{0.3cm}
+    Prof.\ Jes de Jesus Fiais Cerqueira\\
+    \vspace{3cm}
+
+    {\LARGE \textbf{LiquidClassifier}}\\
+    \vspace{0.5cm}
+    {\Large \textbf{Sistema Embarcado para Identifica\c{c}\~{a}o e Classifica\c{c}\~{a}o\\
+    de L\'{i}quidos com ESP32 e Machine Learning}}\\
+    \vspace{0.5cm}
+    {\large Relat\'{o}rio T\'{e}cnico}\\
+
+    \vspace{3cm}
+
+    \textbf{Equipe:}\\
+    \vspace{0.3cm}
+    Tiago Avelino\\
+    Paulo Mascarenhas\\
+    Enzo Oliveira\\
+
+    \vfill
+    Salvador --- BA\\
+    Junho de 2026
+  \end{center}
+\end{titlepage}
+
+% ============================================================
+% SUM\'{A}RIO
+% ============================================================
+\tableofcontents
+\newpage
+
+% ============================================================
+% 1. INTRODU\c{C}\~{A}O
+% ============================================================
+\section{Introdu\c{c}\~{a}o}
+
+\subsection{Contexto e Motiva\c{c}\~{a}o}
+
+A identifica\c{c}\~{a}o e classifica\c{c}\~{a}o de l\'{i}quidos \'{e} uma necessidade presente em diversas \'{a}reas da engenharia e da sociedade. Desde a verifica\c{c}\~{a}o da potabilidade da \'{a}gua em comunidades rurais at\'{e} a detec\c{c}\~{a}o de adultera\c{c}\~{a}o de combust\'{i}veis em postos, a capacidade de identificar rapidamente o tipo de l\'{i}quido --- sem equipamentos de laborat\'{o}rio --- representa um avan\c{c}o significativo em termos de acessibilidade e custo.
+
+Os m\'{e}todos tradicionais de an\'{a}lise qu\'{i}mica requerem equipamentos caros, profissionais especializados e tempo de processamento. Este projeto prop\~{o}e uma solu\c{c}\~{a}o alternativa: um sistema embarcado port\'{a}til, de baixo custo ($\sim$ R\$ 118), capaz de classificar l\'{i}quidos em tempo real utilizando sensores multimodais e um modelo de Machine Learning embarcado no microcontrolador ESP32.
+
+\subsection{Problema (Dor do Usu\'{a}rio)}
+
+O usu\'{a}rio-alvo enfrenta as seguintes dificuldades:
+
+\begin{itemize}
+  \item \textbf{Custo elevado}: Equipamentos de an\'{a}lise qu\'{i}mica custam milhares de reais e n\~{a}o s\~{a}o acess\'{i}veis para pequenos produtores, comunidades ou fiscaliza\c{c}\~{o}es de campo.
+  \item \textbf{Tempo de resposta}: An\'{a}lises laboratoriais levam horas ou dias. O usu\'{a}rio precisa de resultado imediato.
+  \item \textbf{Portabilidade}: N\~{a}o \'{e} poss\'{i}vel levar um laborat\'{o}rio a campo. O sistema deve ser compacto e alimentado por USB.
+  \item \textbf{Simplicidade de uso}: O operador n\~{a}o \'{e} um qu\'{i}mico. O sistema deve funcionar com a\c{c}\~{a}o m\'{i}nima: mergulhar sensores, pressionar um bot\~{a}o e ler o resultado na tela.
+  \item \textbf{Autonomia}: O sistema deve funcionar sem conex\~{a}o com internet, realizando toda a infer\^{e}ncia localmente no microcontrolador.
+\end{itemize}
+
+\subsection{Solu\c{c}\~{a}o Proposta}
+
+O sistema \textbf{LiquidClassifier} utiliza um ESP32 DevKit V1 conectado a cinco sensores (espectral, temperatura, condutividade, pH e ac\'{u}stico) para coletar 14 grandezas f\'{i}sico-qu\'{i}micas de um l\'{i}quido. A partir dessas leituras, 8 features derivadas s\~{a}o calculadas on-device, totalizando 22 features. Um modelo de rede neural (MLP) quantizado para int8 (TFLite, 22~KB) executa a classifica\c{c}\~{a}o em tempo real, identificando o l\'{i}quido entre quatro categorias: \textbf{\'{a}gua}, \textbf{gasolina}, \textbf{suco} e \textbf{bebida alco\'{o}lica}.
+
+\subsection{Objetivos}
+
+\begin{itemize}
+  \item Desenvolver um pipeline completo de Machine Learning para classifica\c{c}\~{a}o de l\'{i}quidos.
+  \item Treinar e comparar 6 modelos de ML (Random Forest, XGBoost, MLP, CNN 1D, SVM, k-NN).
+  \item Converter o melhor modelo para TensorFlow Lite int8 e embarc\'{a}-lo no ESP32.
+  \item Validar o sistema com simula\c{c}\~{a}o de cen\'{a}rios reais.
+  \item Documentar o processo completo para reprodutibilidade.
+\end{itemize}
+
+% ============================================================
+% 2. HARDWARE
+% ============================================================
+\section{Arquitetura de Hardware}
+
+\subsection{Vis\~{a}o Geral}
+
+O sistema \'{e} composto por um microcontrolador ESP32 conectado a cinco sensores e tr\^{e}s dispositivos de sa\'{i}da, conforme a Figura~\ref{fig:arquitetura}.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    sensor/.style={rectangle, draw=ufbablue, fill=ufbablue!10, rounded corners, minimum width=3.2cm, minimum height=0.7cm, align=center, font=\small},
+    mcu/.style={rectangle, draw=ufbablue, fill=ufbablue!20, rounded corners, minimum width=3.5cm, minimum height=1.2cm, align=center, font=\bfseries},
+    output/.style={rectangle, draw=orange!80!black, fill=orange!10, rounded corners, minimum width=3cm, minimum height=0.7cm, align=center, font=\small},
+    arr/.style={-{Stealth[length=5pt]}, thick, ufbablue}
+  ]
+    \node[mcu] (esp) {ESP32\\DevKit V1};
+    \node[sensor, left=2.5cm of esp, yshift=1.5cm]  (as)    {AS7341 --- Espectral};
+    \node[sensor, left=2.5cm of esp, yshift=0.5cm]  (ds)    {DS18B20 --- Temperatura};
+    \node[sensor, left=2.5cm of esp, yshift=-0.5cm] (ph)    {pH E-201-C};
+    \node[sensor, left=2.5cm of esp, yshift=-1.5cm] (cond)  {Eletrodos --- Condutiv.};
+    \node[sensor, left=2.5cm of esp, yshift=-2.5cm] (piezo) {Piezoel\'{e}trico --- Ac\'{u}stico};
+    \node[output, right=2.5cm of esp, yshift=0.8cm]  (serial) {Serial Monitor (PC)};
+    \node[output, right=2.5cm of esp, yshift=-0.4cm] (led)    {LED RGB};
+    \node[output, right=2.5cm of esp, yshift=-1.6cm] (oled)   {OLED SSD1306 (opc.)};
+    \foreach \s in {as,ds,ph,cond,piezo}
+      \draw[arr] (\s) -- (esp);
+    \foreach \o in {serial,led,oled}
+      \draw[arr] (esp) -- (\o);
+  \end{tikzpicture}
+  \caption{Diagrama de blocos do sistema LiquidClassifier.}
+  \label{fig:arquitetura}
+\end{figure}
+
+\subsection{Especifica\c{c}\~{a}o dos Componentes}
+
+A Tabela~\ref{tab:componentes} detalha cada componente do sistema, sua fun\c{c}\~{a}o, conex\~{a}o el\'{e}trica e custo estimado.
+
+\begin{table}[H]
+  \centering
+  \caption{Componentes do sistema LiquidClassifier.}
+  \label{tab:componentes}
+  \begin{tabular}{llll}
+    \toprule
+    \textbf{Componente} & \textbf{Fun\c{c}\~{a}o} & \textbf{Pino ESP32} & \textbf{Custo} \\
+    \midrule
+    ESP32 DevKit V1     & Microcontrolador       & ---           & R\$ 30 \\
+    AS7341              & Espectro \'{o}ptico 11ch   & I2C (21/22)   & R\$ 45 \\
+    DS18B20             & Temperatura            & GPIO 4        & R\$ 8 \\
+    Eletrodos PCB       & Condutividade          & ADC GPIO 34   & R\$ 5 \\
+    M\'{o}dulo pH E-201-C   & pH                     & ADC GPIO 35   & R\$ 25 \\
+    Disco piezoel\'{e}trico & Frequ\^{e}ncia ac\'{u}stica   & ADC GPIO 32   & R\$ 3 \\
+    LED RGB             & Feedback visual        & GPIO 25/26/27 & R\$ 2 \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{Total (sem display OLED opcional)}} & \textbf{R\$ 118} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Justificativa da Escolha dos Sensores}
+
+A sele\c{c}\~{a}o dos sensores foi guiada pelo princ\'{i}pio de \textbf{multimodalidade}: cada sensor captura uma dimens\~{a}o f\'{i}sico-qu\'{i}mica distinta do l\'{i}quido, maximizando a separabilidade entre classes.
+
+\begin{itemize}
+  \item \textbf{AS7341 (espectral)}: Fornece 10 canais (415--680~nm + Clear + NIR), permitindo distinguir l\'{i}quidos por cor e transpar\^{e}ncia. Essencial para diferenciar suco de laranja vs.\ uva, ou gasolina (amarelada) vs.\ \'{a}gua (transparente).
+  \item \textbf{DS18B20 (temperatura)}: Sensor digital de precis\~{a}o ($\pm$0,5$^\circ$C). Al\'{e}m de medir a temperatura diretamente, \'{e} usado para compensar a condutividade (que varia com temperatura).
+  \item \textbf{Eletrodos de condutividade}: L\'{i}quidos possuem condutividades muito distintas --- \'{a}gua mineral ($\sim$500~$\mu$S/cm), gasolina ($\sim$0,1~$\mu$S/cm), suco ($\sim$2000~$\mu$S/cm). Sensor de alto poder discriminat\'{o}rio.
+  \item \textbf{M\'{o}dulo pH}: Diferencia l\'{i}quidos \'{a}cidos (suco de limão, pH$\sim$2,5) de neutros (\'{a}gua, pH$\sim$7) e levemente \'{a}cidos (cerveja, pH$\sim$4,2).
+  \item \textbf{Piezoel\'{e}trico (ac\'{u}stico)}: Captura a frequ\^{e}ncia de resson\^{a}ncia ac\'{u}stica, que depende da densidade e viscosidade do l\'{i}quido. Sensor de baixo custo que adiciona uma dimens\~{a}o complementar.
+\end{itemize}
+
+\subsection{Status Atual do Hardware}
+
+\begin{table}[H]
+  \centering
+  \caption{Status de aquisi\c{c}\~{a}o dos componentes.}
+  \label{tab:status}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Componente} & \textbf{Status} & \textbf{Observa\c{c}\~{a}o} \\
+    \midrule
+    ESP32 DevKit V1        & Dispon\'{i}vel & Em m\~{a}os \\
+    Cabos e jumpers        & Dispon\'{i}vel & Em m\~{a}os \\
+    Sensores piezoel\'{e}tricos & Dispon\'{i}vel & Em m\~{a}os \\
+    DS18B20                & Dispon\'{i}vel & Em m\~{a}os \\
+    AS7341                 & Em tr\^{a}nsito & Mercado Livre \\
+    M\'{o}dulo pH E-201-C      & Em tr\^{a}nsito & Mercado Livre \\
+    Eletrodos condutividade & Em tr\^{a}nsito & Mercado Livre \\
+    LED RGB                & Em tr\^{a}nsito & Mercado Livre \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ============================================================
+% 3. PIPELINE DE MACHINE LEARNING
+% ============================================================
+\section{Pipeline de Machine Learning}
+
+O pipeline completo \'{e} composto por 9 etapas, desde a gera\c{c}\~{a}o de dados sint\'{e}ticos at\'{e} a execu\c{c}\~{a}o em campo, conforme ilustrado na Figura~\ref{fig:pipeline}.
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    wfbox/.style={rectangle, draw=ufbablue, fill=ufbablue!15, rounded corners, minimum width=2.2cm, minimum height=0.9cm, align=center, font=\small\bfseries},
+    arr/.style={-{Stealth[length=5pt]}, very thick, ufbablue},
+    note/.style={font=\tiny, align=center, text=gray}
+  ]
+    \node[wfbox] (gen)   at (0,0)    {1. Gera\c{c}\~{a}o\\de Dados};
+    \node[wfbox] (feat)  at (3,0)    {2. Feature\\Engineering};
+    \node[wfbox] (train) at (6,0)    {3. Treinamento\\6 Modelos};
+    \node[wfbox] (eval)  at (9,0)    {4. Avalia\c{c}\~{a}o\\Comparativa};
+    \node[wfbox] (conv)  at (12,0)   {5. Convers\~{a}o\\TFLite int8};
+    \node[wfbox] (sim)   at (3,-2)   {6. Simula\c{c}\~{a}o};
+    \node[wfbox] (dep)   at (6,-2)   {7. Deploy\\Arduino IDE};
+    \node[wfbox] (flash) at (9,-2)   {8. Flash\\ESP32};
+    \node[wfbox] (run)   at (12,-2)  {9. Execu\c{c}\~{a}o\\em Campo};
+    \draw[arr] (gen)   -- (feat);
+    \draw[arr] (feat)  -- (train);
+    \draw[arr] (train) -- (eval);
+    \draw[arr] (eval)  -- (conv);
+    \draw[arr] (conv)  |- (sim);
+    \draw[arr] (sim)   -- (dep);
+    \draw[arr] (dep)   -- (flash);
+    \draw[arr] (flash) -- (run);
+  \end{tikzpicture}
+  \caption{Pipeline completo do sistema LiquidClassifier.}
+  \label{fig:pipeline}
+\end{figure}
+
+\subsection{Etapa 1 --- Gera\c{c}\~{a}o de Dados Sint\'{e}ticos}
+
+Na aus\^{e}ncia dos sensores f\'{i}sicos (que est\~{a}o em tr\^{a}nsito), optou-se pela gera\c{c}\~{a}o de dados sint\'{e}ticos baseados em propriedades f\'{i}sico-qu\'{i}micas reais dos l\'{i}quidos. Foram definidos \textbf{22 perfis sensoriais} abrangendo:
+
+\begin{itemize}
+  \item \textbf{\'{A}gua} (4 variantes): torneira, mineral, mineral com g\'{a}s, contaminada.
+  \item \textbf{Gasolina} (4 variantes): pura, adulterada 10\%, 20\%, 30\%.
+  \item \textbf{Suco} (5 variantes): laranja, uva, lim\~{a}o, ma\c{c}\~{a}, manga.
+  \item \textbf{Bebida alco\'{o}lica} (9 variantes): Heineken, Stella Artois, Budweiser, IPA, vinho tinto, vinho branco, vodka, cacha\c{c}a, whisky (incluindo adulteradas).
+\end{itemize}
+
+Para cada perfil, foram geradas \textbf{500 amostras} com ru\'{i}do gaussiano ($\sigma = 5\%$), totalizando \textbf{11.000 amostras}. Os valores base de cada perfil foram extra\'{i}dos de literatura cient\'{i}fica e fichas t\'{e}cnicas de sensores.
+
+A divis\~{a}o dos dados seguiu a propor\c{c}\~{a}o:
+
+\begin{table}[H]
+  \centering
+  \caption{Divis\~{a}o do dataset.}
+  \begin{tabular}{lcc}
+    \toprule
+    \textbf{Conjunto} & \textbf{Propor\c{c}\~{a}o} & \textbf{Finalidade} \\
+    \midrule
+    Treino    & 70\% & Aprendizado dos par\^{a}metros \\
+    Valida\c{c}\~{a}o & 15\% & Ajuste de hiperpar\^{a}metros \\
+    Teste     & 15\% & Avalia\c{c}\~{a}o final (n\~{a}o visto no treino) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Etapa 2 --- Feature Engineering}
+
+Al\'{e}m das 14 grandezas brutas dos sensores, foram projetadas \textbf{8 features derivadas} calculadas on-device no ESP32. Estas features capturam rela\c{c}\~{o}es f\'{i}sicas entre as vari\'{a}veis, aumentando a separabilidade entre classes.
+
+\subsubsection{Features Brutas (14)}
+
+\begin{table}[H]
+  \centering
+  \caption{Features brutas dos sensores.}
+  \begin{tabular}{clll}
+    \toprule
+    \textbf{\#} & \textbf{Feature} & \textbf{Sensor} & \textbf{Unidade} \\
+    \midrule
+    0  & temperatura\_C        & DS18B20    & $^\circ$C \\
+    1  & condutividade\_uS     & Eletrodos  & $\mu$S/cm \\
+    2  & pH                    & E-201-C    & --- \\
+    3  & spec\_F1\_415nm        & AS7341 F1  & norm. \\
+    4  & spec\_F2\_445nm        & AS7341 F2  & norm. \\
+    5  & spec\_F3\_480nm        & AS7341 F3  & norm. \\
+    6  & spec\_F4\_515nm        & AS7341 F4  & norm. \\
+    7  & spec\_F5\_555nm        & AS7341 F5  & norm. \\
+    8  & spec\_F6\_590nm        & AS7341 F6  & norm. \\
+    9  & spec\_F7\_630nm        & AS7341 F7  & norm. \\
+    10 & spec\_F8\_680nm        & AS7341 F8  & norm. \\
+    11 & spec\_Clear            & AS7341     & norm. \\
+    12 & spec\_NIR              & AS7341     & norm. \\
+    13 & acustico\_freq\_Hz     & Piezoel\'{e}trico & Hz \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Features Derivadas (8)}
+
+As features derivadas s\~{a}o calculadas a partir das features brutas, tanto no pipeline Python quanto no firmware do ESP32:
+
+\begin{table}[H]
+  \centering
+  \caption{Features derivadas calculadas on-device.}
+  \begin{tabular}{clp{7cm}}
+    \toprule
+    \textbf{\#} & \textbf{Feature} & \textbf{F\'{o}rmula / Descri\c{c}\~{a}o} \\
+    \midrule
+    14 & condutividade\_25C & $\text{cond}_{25} = \dfrac{\text{cond}}{1 + 0{,}02 \cdot (T - 25)}$ \\[6pt]
+    & & Compensa\c{c}\~{a}o t\'{e}rmica da condutividade ($\alpha = 0{,}02\,/^\circ$C). \\[4pt]
+    15 & ratio\_azul\_vermelho & $F3_{480\text{nm}} \,/\, F7_{630\text{nm}}$ \\
+    16 & ratio\_verde\_vermelho & $F4_{515\text{nm}} \,/\, F7_{630\text{nm}}$ \\
+    17 & ratio\_nir\_clear & NIR / Clear \\
+    18 & ratio\_violeta\_laranja & $F1_{415\text{nm}} \,/\, F6_{590\text{nm}}$ \\
+    19 & spectral\_mean & M\'{e}dia dos 10 canais espectrais \\
+    20 & spectral\_std & Desvio padr\~{a}o dos 10 canais espectrais \\
+    21 & spectral\_range & $\max(\text{canais}) - \min(\text{canais})$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Justificativa das raz\~{o}es espectrais}: As raz\~{o}es entre canais espectrais s\~{a}o invariantes \`{a} intensidade da fonte de luz, tornando o sistema robusto a varia\c{c}\~{o}es ambientais. A raz\~{a}o azul/vermelho distingue l\'{i}quidos alaranjados (suco, gasolina) de l\'{i}quidos claros (\'{a}gua). A raz\~{a}o NIR/Clear indica absor\c{c}\~{a}o no infravermelho, \'{u}til para detectar compostos org\^{a}nicos.
+
+\subsubsection{Normaliza\c{c}\~{a}o}
+
+Todas as 22 features s\~{a}o normalizadas com \textbf{StandardScaler} (m\'{e}dia $\mu = 0$, desvio padr\~{a}o $\sigma = 1$):
+\[
+  x_{\text{norm}} = \frac{x - \mu}{\sigma}
+\]
+Os par\^{a}metros $\mu$ e $\sigma$ de cada feature s\~{a}o exportados como arrays C (\texttt{feature\_mean[22]} e \texttt{feature\_scale[22]}) e embarcados no ESP32 no arquivo \texttt{normalization\_params.h}.
+
+\subsection{Etapa 3 --- Treinamento de Modelos}
+
+Foram treinados e comparados \textbf{6 modelos de Machine Learning}, utilizando os frameworks scikit-learn, XGBoost e TensorFlow/Keras:
+
+\begin{table}[H]
+  \centering
+  \caption{Modelos treinados e seus hiperpar\^{a}metros principais.}
+  \begin{tabular}{llp{6cm}}
+    \toprule
+    \textbf{Modelo} & \textbf{Framework} & \textbf{Hiperpar\^{a}metros} \\
+    \midrule
+    Random Forest  & scikit-learn  & 200 \'{a}rvores, profundidade m\'{a}x.\ 15, min\_samples\_split=5 \\
+    XGBoost        & xgboost       & 200 estimadores, lr=0,1, max\_depth=6 \\
+    MLP            & TensorFlow/Keras & Camadas [128, 64, 32], 50 \'{e}pocas, batch=64 \\
+    CNN 1D         & TensorFlow/Keras & 2 camadas Conv1D, pool, dense \\
+    SVM            & scikit-learn  & Kernel RBF, $C=1{,}0$, $\gamma=\text{scale}$ \\
+    k-NN           & scikit-learn  & $k=5$, pesos por dist\^{a}ncia \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Etapa 4 --- Classifica\c{c}\~{a}o Hier\'{a}rquica}
+
+O pipeline adota uma estrat\'{e}gia de classifica\c{c}\~{a}o hier\'{a}rquica em \textbf{7 est\'{a}gios}. O primeiro est\'{a}gio classifica o tipo principal; os est\'{a}gios subsequentes refinam a classifica\c{c}\~{a}o dentro de cada tipo:
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}[
+    box/.style={rectangle, draw=ufbablue, fill=ufbablue!10, rounded corners, minimum width=2.5cm, minimum height=0.6cm, align=center, font=\scriptsize\bfseries},
+    arr/.style={-{Stealth[length=4pt]}, thick, ufbablue}
+  ]
+    \node[box] (tipo) at (0,0) {Etapa 3: TIPO\\(4 classes)};
+    \node[box] (agua) at (-5,-1.5) {4a: \'{A}gua\\variante};
+    \node[box] (gas)  at (-1.7,-1.5) {4b: Gasolina\\adultera\c{c}\~{a}o};
+    \node[box] (suco) at (1.7,-1.5)  {4c: Suco\\sabor};
+    \node[box] (alc)  at (5,-1.5)   {4d: Alco\'{o}lica\\subtipo};
+    \node[box] (cerv) at (3.5,-3)  {4e: Cerveja\\marca};
+    \node[box] (genu) at (6.5,-3)  {4f: Genu\'{i}na\\vs adulterada};
+    \draw[arr] (tipo) -- (agua);
+    \draw[arr] (tipo) -- (gas);
+    \draw[arr] (tipo) -- (suco);
+    \draw[arr] (tipo) -- (alc);
+    \draw[arr] (alc)  -- (cerv);
+    \draw[arr] (alc)  -- (genu);
+  \end{tikzpicture}
+  \caption{Estrutura hier\'{a}rquica de classifica\c{c}\~{a}o.}
+  \label{fig:hierarquia}
+\end{figure}
+
+Cada est\'{a}gio treina os 6 modelos de forma independente e seleciona o de melhor desempenho.
+
+\subsection{Etapa 5 --- Resultados e Avalia\c{c}\~{a}o}
+
+A Tabela~\ref{tab:resultados} apresenta o melhor modelo e a acur\'{a}cia obtida no conjunto de teste para cada est\'{a}gio da classifica\c{c}\~{a}o hier\'{a}rquica.
+
+\begin{table}[H]
+  \centering
+  \caption{Resultados de acur\'{a}cia por est\'{a}gio de classifica\c{c}\~{a}o.}
+  \label{tab:resultados}
+  \begin{tabular}{llcc}
+    \toprule
+    \textbf{Etapa} & \textbf{Problema} & \textbf{Melhor Modelo} & \textbf{Acur\'{a}cia Teste} \\
+    \midrule
+    3  & Tipo (4 classes)          & k-NN      & \textbf{99,82\%} \\
+    4a & \'{A}gua --- variante         & XGBoost   & 97,87\% \\
+    4b & Gasolina --- adultera\c{c}\~{a}o  & XGBoost   & 88,27\% \\
+    4c & Suco --- sabor              & XGBoost   & 97,87\% \\
+    4d & Alco\'{o}lica --- subtipo       & k-NN      & 96,92\% \\
+    4e & Cerveja --- marca           & k-NN      & 93,60\% \\
+    4f & Genu\'{i}na vs adulterada     & k-NN      & 99,37\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{An\'{a}lise}: A classifica\c{c}\~{a}o de tipo (Etapa 3) alcan\c{c}ou 99,82\% de acur\'{a}cia com k-NN, demonstrando que as 22 features possuem alto poder discriminat\'{o}rio para separar os 4 tipos principais. O est\'{a}gio mais desafiador foi a detec\c{c}\~{a}o de adultera\c{c}\~{a}o de gasolina (88,27\%), o que \'{e} esperado dado que as diferen\c{c}as entre gasolina pura e adulterada 10\% s\~{a}o sutis.
+
+% ============================================================
+% 4. CONVERS\~{A}O E DEPLOY
+% ============================================================
+\section{Convers\~{a}o para TFLite e Deploy no ESP32}
+
+\subsection{Etapa 6 --- Convers\~{a}o para TFLite int8}
+
+O modelo selecionado para deploy foi a \textbf{MLP (Rede Neural)}, por oferecer o melhor equil\'{i}brio entre acur\'{a}cia e compatibilidade com o runtime TensorFlow Lite Micro.
+
+O processo de convers\~{a}o seguiu estas etapas:
+
+\begin{enumerate}
+  \item \textbf{Treinamento}: MLP com camadas [128, 64, 32] usando Keras 3.
+  \item \textbf{Exporta\c{c}\~{a}o}: Encapsulamento em \texttt{tf.Module} com \texttt{concrete\_functions} para compatibilidade com Keras 3.
+  \item \textbf{Quantiza\c{c}\~{a}o}: P\'{o}s-treinamento, full integer (int8). Cada peso e ativa\c{c}\~{a}o \'{e} representado como inteiro de 8 bits com par\^{a}metros de escala e zero-point:
+    \[
+      q = \text{round}\left(\frac{x}{\text{scale}} + \text{zero\_point}\right)
+    \]
+  \item \textbf{Gera\c{c}\~{a}o do \texttt{.tflite}}: Arquivo bin\'{a}rio de 22.448 bytes.
+  \item \textbf{Convers\~{a}o para header C}: O arquivo \texttt{.tflite} \'{e} convertido para um array C (\texttt{unsigned char liquid\_classifier[]}) inclu\'{i}do diretamente no c\'{o}digo-fonte do ESP32.
+\end{enumerate}
+
+\begin{table}[H]
+  \centering
+  \caption{Compara\c{c}\~{a}o de tamanhos do modelo.}
+  \begin{tabular}{lc}
+    \toprule
+    \textbf{Formato} & \textbf{Tamanho} \\
+    \midrule
+    Keras original (\texttt{.keras}) & 223 KB \\
+    TFLite int8 (\texttt{.tflite})   & 22 KB \\
+    Header C (\texttt{.h})           & 140 KB (texto) \\
+    Arena de mem\'{o}ria no ESP32       & 16 KB \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+A redu\c{c}\~{a}o de 223~KB para 22~KB ($\downarrow$90\%) foi obtida pela quantiza\c{c}\~{a}o int8, que reduz cada par\^{a}metro de 32 bits (float) para 8 bits (int8), com perda m\'{i}nima de acur\'{a}cia.
+
+\subsection{Etapa 7 --- Simula\c{c}\~{a}o de Cen\'{a}rios Reais}
+
+Antes do deploy no hardware, o modelo TFLite foi validado com \textbf{49 cen\'{a}rios realistas}, simulando situa\c{c}\~{o}es de uso em campo. Exemplos:
+
+\begin{itemize}
+  \item \'{A}gua de torneira com temperatura ambiente (23$^\circ$C) $\rightarrow$ classificado corretamente como ``\'{A}gua''.
+  \item Gasolina adulterada com 20\% de etanol $\rightarrow$ classificado corretamente como ``Gasolina''.
+  \item Cerveja Heineken a 5$^\circ$C $\rightarrow$ classificado corretamente como ``Alco\'{o}lica''.
+  \item Suco de laranja natural $\rightarrow$ classificado corretamente como ``Suco''.
+\end{itemize}
+
+\textbf{Resultado}: 45 de 49 acertos (\textbf{91,8\%} de acur\'{a}cia em cen\'{a}rios reais) --- \textbf{APROVADO}.
+
+Os 4 erros concentraram-se em casos limítrofes, como gasolina com baixo grau de adulteração, o que é consistente com os resultados de teste da Etapa 4b.
+
+\subsection{Etapa 8 --- Firmware Arduino IDE}
+
+O firmware foi desenvolvido como um sketch Arduino IDE (\texttt{LiquidClassifier.ino}), compat\'{i}vel com o board ``ESP32 Dev Module''. O fluxo de execu\c{c}\~{a}o no microcontrolador \'{e}:
+
+\begin{enumerate}
+  \item Inicializar sensores (I2C, OneWire, ADC) e carregar modelo TFLite na mem\'{o}ria.
+  \item Aguardar comando do usu\'{a}rio (bot\~{a}o BOOT ou Serial Monitor).
+  \item Ler 14 grandezas dos 5 sensores.
+  \item Calcular 8 features derivadas on-device.
+  \item Normalizar as 22 features com StandardScaler (par\^{a}metros embarcados).
+  \item Quantizar float $\rightarrow$ int8 e alimentar o tensor de entrada.
+  \item Executar infer\^{e}ncia TFLite Micro ($<$10~ms).
+  \item Desquantizar sa\'{i}da e identificar a classe com maior score.
+  \item Exibir resultado no Serial Monitor (sa\'{i}da principal), LED RGB (cor por classe) e opcionalmente display OLED.
+\end{enumerate}
+
+\subsubsection{Bibliotecas Utilizadas}
+
+\begin{table}[H]
+  \centering
+  \caption{Bibliotecas Arduino necess\'{a}rias.}
+  \begin{tabular}{llc}
+    \toprule
+    \textbf{Biblioteca} & \textbf{Autor} & \textbf{Obrigat\'{o}ria} \\
+    \midrule
+    Adafruit AS7341       & Adafruit           & Sim \\
+    OneWire               & Paul Stoffregen    & Sim \\
+    DallasTemperature     & Miles Burton       & Sim \\
+    TensorFlowLite\_ESP32 & Masayuki Tanaka    & Sim \\
+    Adafruit SSD1306      & Adafruit           & Somente c/ OLED \\
+    Adafruit GFX Library  & Adafruit           & Somente c/ OLED \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Feedback ao Usu\'{a}rio}
+
+O resultado \'{e} apresentado em tr\^{e}s formatos:
+
+\begin{itemize}
+  \item \textbf{Serial Monitor} (115200 baud): Sa\'{i}da principal com nome do l\'{i}quido, confian\c{c}a e leituras dos sensores em formato tabular.
+  \item \textbf{LED RGB}: Azul = \'{A}gua, Vermelho = Alco\'{o}lica, Amarelo = Gasolina, Verde = Suco.
+  \item \textbf{Display OLED SSD1306} (opcional): Nome do l\'{i}quido em fonte grande, porcentagem de confian\c{c}a e dados sensoriais.
+\end{itemize}
+
+% ============================================================
+% 5. REPOSIT\'{O}RIO
+% ============================================================
+\section{Reposit\'{o}rio e Reprodutibilidade}
+
+Todo o c\'{o}digo-fonte est\'{a} dispon\'{i}vel publicamente no GitHub:
+
+\begin{center}
+  \url{https://github.com/guingas/liquidosESP}
+\end{center}
+
+\subsection{Estrutura do Reposit\'{o}rio}
+
+\begin{lstlisting}[language={},basicstyle=\ttfamily\small,frame=none]
+liquidosESP/
++-- README.md                  Documentacao completa
++-- LiquidClassifier/          Sketch Arduino IDE
+|   +-- LiquidClassifier.ino   Codigo principal
+|   +-- liquid_classifier.h    Modelo TFLite (array C)
+|   +-- normalization_params.h Parametros do StandardScaler
++-- models/tflite/
+|   +-- liquid_classifier.tflite  Modelo binario
++-- training/                  Pipeline Python
+    +-- main.py                Orquestrador principal
+    +-- config/settings.py     Configuracoes
+    +-- src/                   Modulos de ML
+\end{lstlisting}
+
+\subsection{Ferramentas de Desenvolvimento}
+
+\begin{table}[H]
+  \centering
+  \caption{Stack tecnol\'{o}gica utilizada.}
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Componente} & \textbf{Ferramenta / Vers\~{a}o} \\
+    \midrule
+    Linguagem (treinamento) & Python 3.12 \\
+    ML / DL           & scikit-learn 1.8, XGBoost 3.0, TensorFlow 2.20 \\
+    Convers\~{a}o TFLite  & TensorFlow Lite Converter (int8) \\
+    Firmware           & Arduino IDE + TensorFlowLite\_ESP32 \\
+    Microcontrolador   & ESP32 DevKit V1 (Xtensa dual-core, 240 MHz) \\
+    Controle de vers\~{a}o & Git + GitHub \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ============================================================
+% 6. CONCLUS\~{O}ES
+% ============================================================
+\section{Conclus\~{o}es}
+
+Este trabalho apresentou o desenvolvimento completo de um sistema embarcado para classifica\c{c}\~{a}o de l\'{i}quidos, abrangendo desde a gera\c{c}\~{a}o de dados sint\'{e}ticos at\'{e} o deploy em microcontrolador ESP32 via Arduino IDE.
+
+Os principais resultados obtidos foram:
+
+\begin{enumerate}
+  \item \textbf{Acur\'{a}cia de 99,82\%} na classifica\c{c}\~{a}o de tipo (4 classes) com k-NN, demonstrando que a combina\c{c}\~{a}o de sensores multimodais com features derivadas proporciona alta separabilidade.
+  \item \textbf{Modelo compacto de 22~KB} (TFLite int8), que cabe confortavelmente na mem\'{o}ria do ESP32 com arena de apenas 16~KB.
+  \item \textbf{91,8\% de acur\'{a}cia em simula\c{c}\~{a}o de cen\'{a}rios reais} (45/49 acertos), validando a robustez do sistema antes do deploy f\'{i}sico.
+  \item \textbf{Custo total de $\sim$R\$ 118}, tornando o sistema acess\'{i}vel para aplica\c{c}\~{o}es de campo e educa\c{c}\~{a}o.
+  \item \textbf{Sistema aut\^{o}nomo}: toda a infer\^{e}ncia ocorre localmente, sem necessidade de conex\~{a}o com internet ou servi\c{c}os em nuvem.
+\end{enumerate}
+
+\subsection{Trabalhos Futuros}
+
+\begin{itemize}
+  \item \textbf{Valida\c{c}\~{a}o com dados reais}: Ap\'{o}s a chegada dos sensores, coletar dados reais para re-treinar e validar o modelo.
+  \item \textbf{Sub-classifica\c{c}\~{a}o embarcada}: Embarcar os modelos hier\'{a}rquicos adicionais (Etapas 4a--4f) no ESP32.
+  \item \textbf{Comunica\c{c}\~{a}o sem fio}: Adicionar envio de resultados via Bluetooth ou Wi-Fi para aplicativo mobile.
+  \item \textbf{Calibra\c{c}\~{a}o automatizada}: Implementar rotina de calibra\c{c}\~{a}o dos sensores anal\'{o}gicos via Serial Monitor.
+  \item \textbf{Alimenta\c{c}\~{a}o por bateria}: Avaliar consumo energ\'{e}tico e viabilizar opera\c{c}\~{a}o com bateria LiPo.
+\end{itemize}
+
+% ============================================================
+% REFER\^{E}NCIAS
+% ============================================================
+\section{Refer\^{e}ncias}
+
+\begin{enumerate}
+  \item TENSORFLOW. TensorFlow Lite for Microcontrollers. Dispon\'{i}vel em: \url{https://www.tensorflow.org/lite/microcontrollers}. Acesso em: jun.\ 2026.
+  \item AMS-OSRAM. AS7341 11-Channel Multi-Spectral Sensor --- Datasheet. 2023.
+  \item MAXIM INTEGRATED. DS18B20 Programmable Resolution 1-Wire Digital Thermometer --- Datasheet. 2019.
+  \item PEDREGOSA, F. et al.\ Scikit-learn: Machine Learning in Python. \textit{Journal of Machine Learning Research}, v.\ 12, p.\ 2825--2830, 2011.
+  \item CHEN, T.; GUESTRIN, C. XGBoost: A Scalable Tree Boosting System. In: \textit{KDD}, 2016.
+  \item ESPRESSIF SYSTEMS. ESP32 Technical Reference Manual. 2024.
+  \item SOLOMON SYSTECH. SSD1306 128x64 Dot Matrix OLED/PLED Segment/Common Driver --- Datasheet. 2008.
+\end{enumerate}
+
+\end{document}
